@@ -1,4 +1,4 @@
-from app.rag.router.rag_router import rag_router
+from app.rag.router.rag import rag_router
 from fastapi import APIRouter
 
 app_router = APIRouter()
