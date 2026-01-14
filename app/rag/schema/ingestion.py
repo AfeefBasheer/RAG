@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, StrictStr
 
-class ingestion_data_schema(BaseModel):
-    text:str
+class IngestionDataSchema(BaseModel):
+    text: StrictStr #strings are allowed
