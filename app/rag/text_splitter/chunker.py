@@ -1,7 +1,7 @@
 from app.rag.core.string_guard import require_str
 
 
-def split_data(text: str, chunk_size: int, overlap_size: int):
+def chunk_data(text: str, chunk_size: int, overlap_size: int):
     text = require_str(text, name="split_data")
 
     if len(text) == 0:
