@@ -1,4 +1,4 @@
-from app.rag.core.string_guard import require_str
+from app.core.string_guard import require_str
 from app.rag.embedder.config import MAX_CHUNK_CHARS_V1
 
 

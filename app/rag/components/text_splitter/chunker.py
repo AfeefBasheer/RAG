@@ -1,4 +1,4 @@
-from app.rag.core.string_guard import require_str
+from app.core.string_guard import require_str
 
 
 def chunk_data(text: str, chunk_size: int, overlap_size: int):

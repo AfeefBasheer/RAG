@@ -1,11 +1,12 @@
 from fastapi import APIRouter
-from app.rag.schema.ingestion import IngestionDataSchema
-from app.rag.pipeline.ingestion import ingest
+from uuid import UUID
+# from app.rag.application.ingestion import ingest_document
 
 ingestion_router = APIRouter()
 
 
-@ingestion_router.post("/ingest")
-def ingest_data(ingestion_data: IngestionDataSchema):
-    response = ingest(ingestion_data)
-    return response
+@ingestion_router.post("/ingest/{document_id}")
+async def ingest_endpoint(document_id: UUID):
+    print(document_id)
+    # response = await ingest_document(document_id)
+    # return response
