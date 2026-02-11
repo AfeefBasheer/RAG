@@ -1,7 +1,8 @@
 from app.core.string_guard import require_str
+from app.document.schema.document import RawChunkObject
 
 
-def chunk_data(text: str, chunk_size: int, overlap_size: int):
+def chunk_data_by_chars(text: str, chunk_size: int, overlap_size: int):
     text = require_str(text, name="split_data")
 
     if len(text) == 0:
@@ -15,10 +16,12 @@ def chunk_data(text: str, chunk_size: int, overlap_size: int):
 
     start = 0
     n = len(text)
-
+    index = 0
     while start < n:
         end = min(start + chunk_size, n)
-        text_chunks.append(text[start:end])
+        chunk = RawChunkObject(chunk_index = index,content=text[start:end], char_count=len(text[start:end]))
+        index = index+1
+        text_chunks.append(chunk)
 
         if end == n:
             break
