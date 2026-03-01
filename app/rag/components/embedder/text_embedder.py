@@ -1,8 +1,38 @@
 from app.rag.components.text_splitter.chunks_validator import validate_chunks
-from sentence_transformers import SentenceTransformer
-model = SentenceTransformer("BAAI/bge-base-en-v1.5")
+import requests
+from dotenv import load_dotenv
+import os
 
-async def embed_the_chunks(chunks: list) -> list:
-    chunks = validate_chunks(chunks)
-    embedded_data = model.encode(chunks, normalize_embeddings=True,device = "cpu")
-    return embedded_data
+load_dotenv()
+
+API_URL = os.getenv("EMBEDDER_API_URL")
+EMBEDDER_KEY = os.getenv("EMBEDDER_TOKEN")
+headers = {"Authorization": f"Bearer {EMBEDDER_KEY}"}
+
+
+def embed_the_chunks(chunks: list, TIMEOUT=60) -> list:
+    validated_chunks = validate_chunks(chunks)
+    payload = {"inputs": validated_chunks}
+    response = requests.post(API_URL, headers=headers, json=payload, timeout=TIMEOUT)
+    if response.status_code != 200:
+        raise Exception(
+            f"Embedding the chunks failed | Status: {response.status_code} | Body: {response.text}"
+        )
+    embeddings = response.json()
+
+    if not isinstance(embeddings, list):
+        raise Exception("Invalid Response format")
+    if not len(embeddings) == len(validated_chunks):
+        raise Exception("Invalid Response size")
+    return embeddings
+
+
+def embed_the_query(query_content:str, TIMEOUT=60) -> list:
+    payload = {"inputs": [query_content]}
+    response = requests.post(API_URL, headers=headers, json=payload, timeout=TIMEOUT)
+    if response.status_code != 200:
+        raise Exception(
+            f"Embedding the query failed | Status: {response.status_code} | Body: {response.text}"
+        )
+    embedded_query = response.json()
+    return embedded_query

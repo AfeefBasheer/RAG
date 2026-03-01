@@ -1,4 +1,4 @@
-from app.document.router.v1.text import text_router
+from app.document.router.v1.text_router import text_router
 from fastapi import APIRouter
 
 document_router = APIRouter()

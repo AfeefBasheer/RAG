@@ -1,5 +1,5 @@
 from app.core.string_guard import require_str
-from app.document.schema.document import RawChunkObject
+from app.document.schema.chunk_schema import RawChunkRecord
 
 
 def chunk_data_by_chars(text: str, chunk_size: int, overlap_size: int):
@@ -19,7 +19,7 @@ def chunk_data_by_chars(text: str, chunk_size: int, overlap_size: int):
     index = 0
     while start < n:
         end = min(start + chunk_size, n)
-        chunk = RawChunkObject(chunk_index = index,content=text[start:end], char_count=len(text[start:end]))
+        chunk = RawChunkRecord(chunk_index = index,content=text[start:end], char_count=len(text[start:end]))
         index = index+1
         text_chunks.append(chunk)
 
