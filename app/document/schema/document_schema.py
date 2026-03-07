@@ -13,7 +13,6 @@ class DocumentStatus(str, Enum):
 
 
 class DocumentRecord(BaseModel):
-    tenant_id :UUID
     content: StrictStr
     source_type: Literal["text"] = "text"
     status: DocumentStatus
