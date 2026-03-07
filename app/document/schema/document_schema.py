@@ -13,6 +13,7 @@ class DocumentStatus(str, Enum):
 
 
 class DocumentRecord(BaseModel):
+    tenant_id :UUID
     content: StrictStr
     source_type: Literal["text"] = "text"
     status: DocumentStatus
@@ -26,7 +27,6 @@ class Document(BaseModel):
     status: DocumentStatus
     content_hash: StrictStr
     storage_path: Optional[str] = None
-    tenant_id: UUID
     error: Optional[str] = None
     created_at: datetime
     request_id: Optional[str] = None
