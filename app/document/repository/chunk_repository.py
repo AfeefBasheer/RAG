@@ -12,12 +12,13 @@ def create_chunks(rows: list[dict]):
         raise
 
 
-def get_chunks_by_document_id(document_id: UUID):
+def get_chunks_by_document_id(document_id: UUID, tenant_id: UUID):
     try:
         response = (
             supabase.table("chunks")
             .select("*")
             .eq("document_id", document_id)
+            .eq("tenant_id", tenant_id)
             .execute()
         )
         return response.data

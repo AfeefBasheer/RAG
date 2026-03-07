@@ -10,13 +10,16 @@ def create_embeddings(points, collection_name):
     return response
 
 
-def get_embeddings_count(collection_name, document_id):
+def get_embeddings_count(collection_name, document_id,tenant_id):
     result = qdrant_client.count(
         collection_name=collection_name,
         count_filter=Filter(
             must=[
                 FieldCondition(
                     key="document_id", match=MatchValue(value=str(document_id))
+                ),
+                FieldCondition(
+                    key="tenant_id", match=MatchValue(value=str(tenant_id))
                 ),
             ]
         ),

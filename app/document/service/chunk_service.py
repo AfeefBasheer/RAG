@@ -4,11 +4,11 @@ from app.document.schema.chunk_schema import RawChunkRecord, ChunkRecord
 from app.core.hash import hash_content
 
 
-def fetch_chunks_by_document_id(document_id: UUID):
-    return get_chunks_by_document_id(document_id)
+def fetch_chunks_by_document_id(document_id: UUID,tenant_id:UUID):
+    return get_chunks_by_document_id(document_id,tenant_id)
 
 
-def insert_chunks(document_id: UUID, raw_chunks: list[RawChunkRecord]):
+def insert_chunks(document_id: UUID, raw_chunks: list[RawChunkRecord],tenant_id:UUID):
     chunks: list[ChunkRecord] = []
 
     for raw_chunk in raw_chunks:
@@ -16,6 +16,7 @@ def insert_chunks(document_id: UUID, raw_chunks: list[RawChunkRecord]):
 
         chunk = ChunkRecord(
             document_id=document_id,
+            tenant_id = tenant_id,
             content=raw_chunk.content,
             content_hash=content_hash,
             char_count=raw_chunk.char_count,
