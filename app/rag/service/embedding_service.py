@@ -16,9 +16,9 @@ def insert_embeddings(collection_name,chunks,embeddings):
                 id=chunk["chunk_id"],  # UUID is perfect
                 vector=normalize(vector),
                 payload={
-                    "tenant_id": chunk["tenant_id"],
                     "document_id": chunk["document_id"],
                     "content_hash": chunk["content_hash"],
+                    "content":chunk["content"],
                     "chunk_index": chunk["chunk_index"],
                 },
             )

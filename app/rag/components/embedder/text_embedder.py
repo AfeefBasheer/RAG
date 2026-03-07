@@ -28,7 +28,7 @@ def embed_the_chunks(chunks: list, TIMEOUT=60) -> list:
 
 
 def embed_the_query(query_content:str, TIMEOUT=60) -> list:
-    payload = {"inputs": [query_content]}
+    payload = {"inputs": query_content}
     response = requests.post(API_URL, headers=headers, json=payload, timeout=TIMEOUT)
     if response.status_code != 200:
         raise Exception(
