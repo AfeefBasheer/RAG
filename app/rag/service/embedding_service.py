@@ -1,9 +1,10 @@
 from app.rag.repository.ingestion_repository import create_embeddings,get_embeddings_count
 from qdrant_client.models import PointStruct
 from app.core.vector_normalizer import normalize
+from uuid import UUID
 
 
-def insert_embeddings(collection_name,chunks,embeddings):
+def insert_embeddings(collection_name:str,chunks,embeddings:list,user_id:UUID,tenant_id:UUID):
     if(len(chunks) != len(embeddings)):
         raise Exception(f"Chunk Length not equal to emebdding length")
     elif(len(chunks) == 0 or len(embeddings)==0): 
@@ -17,6 +18,8 @@ def insert_embeddings(collection_name,chunks,embeddings):
                 vector=normalize(vector),
                 payload={
                     "document_id": chunk["document_id"],
+                    "user_id":user_id,
+                    "tenant_id":tenant_id,
                     "content_hash": chunk["content_hash"],
                     "content":chunk["content"],
                     "chunk_index": chunk["chunk_index"],
@@ -27,7 +30,7 @@ def insert_embeddings(collection_name,chunks,embeddings):
     response = create_embeddings(points,collection_name)
     return response
 
-def check_embeddings(collection_name,document_id,chunk_length):
-    result = get_embeddings_count(collection_name,document_id)
+def check_embeddings(chunk_length:int,collection_name:str,document_id:UUID,user_id:UUID,tenant_id:UUID):
+    result = get_embeddings_count(collection_name,document_id,user_id,tenant_id)
     if(result.count == chunk_length): return True
     return False
