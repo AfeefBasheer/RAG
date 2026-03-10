@@ -10,7 +10,13 @@ def insert_query(query: QuerySchema):
     try:
         response = (
             supabase.table("query")
-            .insert({"content": query.content, "tenant_id": str(query.tenant_id)})
+            .insert(
+                {
+                    "content": query.content,
+                    "user_id": str(query.user_id),
+                    "tenant_id": str(query.tenant_id),
+                }
+            )
             .execute()
         )
         return response.data[0]
@@ -32,7 +38,7 @@ def insert_retrieved_chunks(retrieved_data):
 
 
 def retrieve_chunks(
-    query_vector: str, COLLECTION_NAME: str, TOP_K: int, tenant_id: UUID
+    query_vector: str, COLLECTION_NAME: str, TOP_K: int, user_id: UUID, tenant_id: UUID
 ):
     response = qdrant_client.query_points(
         collection_name=COLLECTION_NAME,
@@ -40,7 +46,8 @@ def retrieve_chunks(
         limit=TOP_K,
         query_filter=Filter(
             must=[
-                FieldCondition(key="tenant_id", match=MatchValue(value=str(tenant_id)))
+                FieldCondition(key="tenant_id", match=MatchValue(value=str(tenant_id))),
+                FieldCondition(key="user_id", match=MatchValue(value=str(user_id))),
             ]
         ),
     )
