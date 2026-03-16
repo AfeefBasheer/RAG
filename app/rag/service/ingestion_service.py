@@ -21,7 +21,7 @@ from uuid import UUID
 def ingest_document(document_id: UUID, user_id: UUID, tenant_id: UUID):
     document = get_document_by_document_id(document_id, user_id, tenant_id)
     if not document.document_id == document_id:
-        raise "Document Doesn't Exist"
+        raise ValueError("Document Doesn't Exist") 
 
     chunk_response = fetch_chunks_by_document_id(document_id, user_id, tenant_id)
     if not chunk_response:
