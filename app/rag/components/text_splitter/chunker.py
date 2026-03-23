@@ -19,8 +19,10 @@ def chunk_data_by_chars(text: str, chunk_size: int, overlap_size: int):
     index = 0
     while start < n:
         end = min(start + chunk_size, n)
-        chunk = RawChunkRecord(chunk_index = index,content=text[start:end], char_count=len(text[start:end]))
-        index = index+1
+        chunk = RawChunkRecord(
+            chunk_index=index, content=text[start:end], char_count=len(text[start:end])
+        )
+        index = index + 1
         text_chunks.append(chunk)
 
         if end == n:
@@ -29,3 +31,4 @@ def chunk_data_by_chars(text: str, chunk_size: int, overlap_size: int):
         start += step
 
     return text_chunks
+

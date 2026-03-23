@@ -37,7 +37,7 @@ def insert_retrieved_chunks(retrieved_data):
         raise
 
 
-def retrieve_chunks(
+def retrieve_embeddings(
     query_vector: str, COLLECTION_NAME: str, TOP_K: int, user_id: UUID, tenant_id: UUID
 ):
     response = qdrant_client.query_points(

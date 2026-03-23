@@ -38,7 +38,6 @@ class RetrievalRow(BaseModel):
 
 
 class RetrievalRowRecord(BaseModel):
-    content: StrictStr  # strings are allowed,
     query_id: UUID
     user_id:UUID
     content_hash: str
