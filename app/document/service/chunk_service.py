@@ -1,6 +1,7 @@
 from app.document.repository.chunk_repository import (
     get_chunks_by_document_id,
     create_chunks,
+    fetch_chunks_by_chunk_ids
 )
 from uuid import UUID
 from app.document.schema.chunk_schema import RawChunkRecord, ChunkRecord
@@ -33,4 +34,8 @@ def insert_chunks(
     rows = [chunk.model_dump(mode="json") for chunk in chunks]
 
     response = create_chunks(rows)
+    return response
+
+def retrieve_chunks(chunk_ids:list,user_id:UUID,tenant_id:UUID):
+    response = fetch_chunks_by_chunk_ids(chunk_ids,user_id,tenant_id)
     return response

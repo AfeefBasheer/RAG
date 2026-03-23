@@ -1,14 +1,11 @@
 from typing import Literal
-from pydantic import BaseModel, StrictStr
+from pydantic import BaseModel, StrictStr, ConfigDict
 
 
 class TextRequestSchema(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     content: StrictStr  # strings are allowed,
     source_type: Literal["text"] = "text"
-
-    class Config:
-        extra = "forbid"
-
 
 class TextSchema(BaseModel):
     content: str

@@ -1,0 +1,15 @@
+from fastapi import APIRouter, Depends
+from app.auth.auth_dependency import get_current_user
+from app.auth.auth_schema import UserBody
+from app.rag.service.retrieval_service import retrieve_data
+from app.rag.schema.retrieval_schema import QueryRequestSchema
+
+retrieval_router = APIRouter()
+
+
+@retrieval_router.post("/retrieve")
+def ingest_endpoint(
+    query: QueryRequestSchema, user: UserBody = Depends(get_current_user)
+):
+    response = retrieve_data(query, user.user_id, user.tenant_id)
+    return response

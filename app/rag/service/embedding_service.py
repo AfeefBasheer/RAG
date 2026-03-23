@@ -20,8 +20,6 @@ def insert_embeddings(collection_name:str,chunks,embeddings:list,user_id:UUID,te
                     "document_id": chunk["document_id"],
                     "user_id":user_id,
                     "tenant_id":tenant_id,
-                    "content_hash": chunk["content_hash"],
-                    "content":chunk["content"],
                     "chunk_index": chunk["chunk_index"],
                 },
             )
