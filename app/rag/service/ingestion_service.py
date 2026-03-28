@@ -1,6 +1,6 @@
 from app.rag.components.embedder.text_embedder import embed_the_chunks
 from app.rag.service.embedding_service import check_embeddings
-from app.rag.components.text_splitter.chunker import chunk_data_by_chars
+from app.rag.components.text_splitter.chunker import chunk_data_by_sentence
 
 from app.document.service.document_service import (
     get_document_by_document_id,
@@ -13,7 +13,7 @@ from app.document.service.chunk_service import (
 )
 from app.rag.service.embedding_service import insert_embeddings
 
-from app.rag.config.text_splitter_config import CHUNK_SIZE_v1, OVERLAP_SIZE_v1
+from app.rag.config.text_splitter_config import CHUNK_SIZE_v1, SENTENCE_OVERLAP_V1
 from app.rag.config.embedder_config import TIMEOUT, COLLECTION_NAME
 from uuid import UUID
 
@@ -25,8 +25,8 @@ def ingest_document(document_id: UUID, user_id: UUID, tenant_id: UUID):
 
     chunk_response = fetch_chunks_by_document_id(document_id, user_id, tenant_id)
     if not chunk_response:
-        raw_chunks = chunk_data_by_chars(
-            document.content, CHUNK_SIZE_v1, OVERLAP_SIZE_v1
+        raw_chunks = chunk_data_by_sentence(
+            document.content, CHUNK_SIZE_v1, SENTENCE_OVERLAP_V1
         )
         chunk_response = insert_chunks(raw_chunks, document_id, user_id, tenant_id)
         if chunk_response:

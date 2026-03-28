@@ -1,5 +1,6 @@
+import httpx
 import os
-from supabase import create_client, Client
+from supabase import create_client, Client, ClientOptions
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -15,4 +16,8 @@ def _require_env(name: str) -> str:
 SUPABASE_URL = _require_env("SUPABASE_URL")
 SUPABASE_KEY = _require_env("SUPABASE_KEY")
 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+supabase = create_client(
+    SUPABASE_URL,
+    SUPABASE_KEY,
+    options=ClientOptions(httpx_client=httpx.Client(http2=False)),
+)
