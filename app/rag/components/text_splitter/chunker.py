@@ -41,74 +41,106 @@ def chunk_data_by_sentence(text: str, chunk_size: int, overlap_size: int):
         raise ValueError("invalid chunk size")
     if overlap_size < 0:
         raise ValueError("invalid overlap size")
+    if overlap_size >= chunk_size:
+        raise ValueError("overlap must be smaller than chunk size")
 
-    sentences = re.split(
-        r"(?<=[.!?])\s+|(?<=[.!?])(?=[A-Z])", text
-    )  # split the text into array of sentences on the basis of space . ! ?
+    # Split into sentences
+    sentences = re.split(r"(?<=[.!?])\s+|(?<=[.!?])(?=[A-Z])", text)
 
     chunks = []
     current_chunk = []
-    current_len = 0
+
+    def join_chunk(chunk_list):
+        return " ".join(chunk_list).strip()
+
+    def chunk_length(chunk_list):
+        if not chunk_list:
+            return 0
+        return sum(len(s) for s in chunk_list) + (len(chunk_list) - 1)
+
+    def trim_overlap(chunk_list):
+        """Keep only last N characters worth of sentences"""
+        total = 0
+        new_chunk = []
+
+        for sentence in reversed(chunk_list):
+            sentence_len = len(sentence)
+            extra_space = 1 if new_chunk else 0
+
+            if total + extra_space + sentence_len > overlap_size:
+                break
+
+            new_chunk.insert(0, sentence)
+            total += extra_space + sentence_len
+
+        return new_chunk
 
     for sentence in sentences:
+        sentence = sentence.strip()
+        if not sentence:
+            continue
+
         sentence_len = len(sentence)
 
-        # handle oversized sentence
+        # 🔴 Handle very large single sentence
         if sentence_len > chunk_size:
             if current_chunk:
-                joined = " ".join(
-                    current_chunk
-                )  # join the array into a single string seperated by space.
+                joined = join_chunk(current_chunk)
                 chunks.append(
-                    RawChunkRecord(
-                        chunk_index=len(chunks),
-                        content=joined,  # appending into the chunks array.
-                        char_count=len(joined),
-                    )
+                    RawChunkRecord(len(chunks), joined, len(joined))
                 )
                 current_chunk = []
-                current_len = 0
 
             for i in range(0, sentence_len, chunk_size):
-                part = sentence[i : i + chunk_size].strip()
+                part = sentence[i:i + chunk_size]
                 chunks.append(
-                    RawChunkRecord( 
-                        chunk_index=len(chunks), #handle if a sentence is larger max_chunK_size
-                        content=part,
-                        char_count=len(part),
-                    )
+                    RawChunkRecord(len(chunks), part, len(part))
                 )
             continue
 
-        extra_space = 1 if current_chunk else 0
+        # Try adding sentence
+        temp_chunk = current_chunk + [sentence]
+        if chunk_length(temp_chunk) <= chunk_size:
+            current_chunk.append(sentence)
+        else:
+            # flush current chunk
+            joined = join_chunk(current_chunk)
 
-        if current_len + extra_space + sentence_len > chunk_size:
-            joined = " ".join(current_chunk)
-            chunks.append(
-                RawChunkRecord(
-                    chunk_index=len(chunks), 
-                    content=joined, # handle extraspace
-                    char_count=len(joined),
+            # 🔴 HARD SAFETY CHECK
+            if len(joined) > chunk_size:
+                raise RuntimeError(
+                    f"Chunk overflow bug: {len(joined)} > {chunk_size}"
                 )
+
+            chunks.append(
+                RawChunkRecord(len(chunks), joined, len(joined))
             )
 
-            # overlap
-            current_chunk = current_chunk[-overlap_size:]
-            current_len = sum(len(s) for s in current_chunk) + max(
-                len(current_chunk) - 1, 0
-            )
+            # apply character-based overlap
+            current_chunk = trim_overlap(current_chunk)
 
-        current_chunk.append(sentence)
-        current_len += extra_space + sentence_len
+            # retry adding sentence after overlap
+            temp_chunk = current_chunk + [sentence]
+            if chunk_length(temp_chunk) > chunk_size:
+                # edge case: sentence still doesn't fit → force new chunk
+                chunks.append(
+                    RawChunkRecord(len(chunks), sentence, len(sentence))
+                )
+                current_chunk = []
+            else:
+                current_chunk.append(sentence)
 
+    # Final flush
     if current_chunk:
-        joined = " ".join(current_chunk)
-        chunks.append(
-            RawChunkRecord(
-                chunk_index=len(chunks), #last sentence
-                content=joined,
-                char_count=len(joined),
+        joined = join_chunk(current_chunk)
+
+        if len(joined) > chunk_size:
+            raise RuntimeError(
+                f"Final chunk overflow bug: {len(joined)} > {chunk_size}"
             )
+
+        chunks.append(
+            RawChunkRecord(len(chunks), joined, len(joined))
         )
 
     return chunks
