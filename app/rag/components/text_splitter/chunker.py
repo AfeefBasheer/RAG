@@ -87,14 +87,18 @@ def chunk_data_by_sentence(text: str, chunk_size: int, overlap_size: int):
             if current_chunk:
                 joined = join_chunk(current_chunk)
                 chunks.append(
-                    RawChunkRecord(len(chunks), joined, len(joined))
+                    RawChunkRecord(
+                        chunk_index=len(chunks), content=joined, char_count=len(joined)
+                    )
                 )
                 current_chunk = []
 
             for i in range(0, sentence_len, chunk_size):
-                part = sentence[i:i + chunk_size]
+                part = sentence[i : i + chunk_size]
                 chunks.append(
-                    RawChunkRecord(len(chunks), part, len(part))
+                    RawChunkRecord(
+                        chunk_index=len(chunks), content=part, char_count=len(part)
+                    )
                 )
             continue
 
@@ -106,14 +110,13 @@ def chunk_data_by_sentence(text: str, chunk_size: int, overlap_size: int):
             # flush current chunk
             joined = join_chunk(current_chunk)
 
-            # 🔴 HARD SAFETY CHECK
             if len(joined) > chunk_size:
-                raise RuntimeError(
-                    f"Chunk overflow bug: {len(joined)} > {chunk_size}"
-                )
+                raise RuntimeError(f"Chunk overflow bug: {len(joined)} > {chunk_size}")
 
             chunks.append(
-                RawChunkRecord(len(chunks), joined, len(joined))
+                RawChunkRecord(
+                    chunk_index=len(chunks), content=joined, char_count=len(joined)
+                )
             )
 
             # apply character-based overlap
@@ -124,7 +127,11 @@ def chunk_data_by_sentence(text: str, chunk_size: int, overlap_size: int):
             if chunk_length(temp_chunk) > chunk_size:
                 # edge case: sentence still doesn't fit → force new chunk
                 chunks.append(
-                    RawChunkRecord(len(chunks), sentence, len(sentence))
+                    RawChunkRecord(
+                        chunk_index=len(chunks),
+                        content=sentence,
+                        char_count=len(sentence),
+                    )
                 )
                 current_chunk = []
             else:
@@ -140,7 +147,9 @@ def chunk_data_by_sentence(text: str, chunk_size: int, overlap_size: int):
             )
 
         chunks.append(
-            RawChunkRecord(len(chunks), joined, len(joined))
+            RawChunkRecord(
+                chunk_index=len(chunks), content=joined, char_count=len(joined)
+            )
         )
 
     return chunks
