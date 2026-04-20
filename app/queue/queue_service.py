@@ -34,3 +34,7 @@ def get_job(job_id: UUID, user_id: UUID, tenant_id: UUID):
 def update_job_to_retry(job_id:UUID,error_message:str,attempt_count:int):
     response = update_job("retry",job_id,error_message,attempt_count)
     return response
+
+def enqueue_document_deletion_job(document_id:UUID,user_id:UUID,tenant_id:UUID):
+    response = create_job('delete_document',document_id,user_id,tenant_id)
+    return response

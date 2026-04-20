@@ -12,7 +12,7 @@ def insert_document(document: DocumentRecord):
                 {
                     "source_type": document.source_type,
                     "tenant_id": str(document.tenant_id),
-                    "user_id":str(document.user_id),
+                    "user_id": str(document.user_id),
                     "content": document.content,
                     "content_hash": document.content_hash,
                     "status": document.status,
@@ -25,7 +25,7 @@ def insert_document(document: DocumentRecord):
         raise
 
 
-def get_document_by_content_hash(content_hash: str,user_id:UUID, tenant_id: UUID):
+def get_document_by_content_hash(content_hash: str, user_id: UUID, tenant_id: UUID):
     try:
         return (
             supabase.table("documents")
@@ -41,7 +41,7 @@ def get_document_by_content_hash(content_hash: str,user_id:UUID, tenant_id: UUID
         raise
 
 
-def get_document_by_document_id(document_id: UUID,user_id:UUID, tenant_id: UUID):
+def get_document_by_document_id(document_id: UUID, user_id: UUID, tenant_id: UUID):
     try:
         response = (
             supabase.table("documents")
@@ -58,7 +58,9 @@ def get_document_by_document_id(document_id: UUID,user_id:UUID, tenant_id: UUID)
         raise
 
 
-def update_document_status(status: DocumentStatus,document_id: UUID,user_id:UUID, tenant_id: UUID):
+def update_document_status(
+    status: DocumentStatus, document_id: UUID, user_id: UUID, tenant_id: UUID
+):
     try:
         return (
             supabase.table("documents")
@@ -70,4 +72,21 @@ def update_document_status(status: DocumentStatus,document_id: UUID,user_id:UUID
         ).data
     except APIError as error:
         print("Error at update_document_status", error)
+        raise
+
+
+def delete_document_by_document_id(document_id: UUID, user_id: UUID, tenant_id: UUID):
+    try:
+        response = (
+            supabase.table("documents")
+            .delete()
+            .eq("document_id", document_id)
+            .eq("user_id", user_id)
+            .eq("tenant_id", tenant_id)
+            .execute()
+            .data
+        )
+        return response
+    except APIError as error:
+        print("Error at delete_document_by_document_id", error)
         raise
