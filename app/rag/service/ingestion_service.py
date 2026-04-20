@@ -21,7 +21,7 @@ from uuid import UUID
 def ingest_document(document_id: UUID, user_id: UUID, tenant_id: UUID):
     document = get_document_by_document_id(document_id, user_id, tenant_id)
     if not document.document_id == document_id:
-        raise ValueError("Document Doesn't Exist") 
+        raise ValueError("Document Doesn't Exist")
 
     chunk_response = fetch_chunks_by_document_id(document_id, user_id, tenant_id)
     if not chunk_response:
@@ -38,10 +38,10 @@ def ingest_document(document_id: UUID, user_id: UUID, tenant_id: UUID):
     )
     if not embedded_data:
         embeddings = embed_the_chunks(chunks, TIMEOUT)
-        embed_response = insert_embeddings(
+        embedded_data = insert_embeddings(
             COLLECTION_NAME, chunk_response, embeddings, user_id, tenant_id
         )
-        if embed_response:
+        if embedded_data:
             mark_document_embedded(document_id, user_id, tenant_id)
 
     return get_document_by_document_id(document_id, user_id, tenant_id)
