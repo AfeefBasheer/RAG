@@ -22,8 +22,8 @@ def update_job_to_completed(job_id: UUID,attempt_count:int):
     return response
 
 
-def update_job_to_failed(job_id: UUID, error_message: str,attempt_count:int):
-    response = update_job("failed", job_id, error_message,attempt_count)
+def update_job_to_failed(job_id: UUID, errors: list,attempt_count:int):
+    response = update_job("failed", job_id, errors,attempt_count)
     return response
 
 
@@ -31,8 +31,8 @@ def get_job(job_id: UUID, user_id: UUID, tenant_id: UUID):
     response = get_job_by_job_id(job_id, user_id, tenant_id)
     return response
 
-def update_job_to_retry(job_id:UUID,error_message:str,attempt_count:int):
-    response = update_job("retry",job_id,error_message,attempt_count)
+def update_job_to_retry(job_id:UUID,errors:list,attempt_count:int):
+    response = update_job("retry",job_id,errors,attempt_count)
     return response
 
 def enqueue_document_deletion_job(document_id:UUID,user_id:UUID,tenant_id:UUID):

@@ -31,12 +31,12 @@ def fetch_job():
         raise
 
 
-def update_job(status, job_id: UUID, error_message: str = None, attempt=3):
+def update_job(status, job_id: UUID, errors: list = None, attempt=3):
     try:
         response = (
             supabase.table("job_queue")
             .update(
-                {"status": status, "error_message": error_message, "attempt": attempt}
+                {"status": status, "error": errors, "attempt": attempt}
             )
             .eq("job_id", job_id)
             .execute()
@@ -51,7 +51,7 @@ def get_job_by_job_id(job_id: UUID, user_id: UUID, tenant_id: UUID):
     try:
         response = (
             supabase.table("job_queue")
-            .select("status,error_message,document_id,job_type")
+            .select("status,error,document_id,job_type")
             .eq("job_id", job_id)
             .eq("user_id", user_id)
             .eq("tenant_id", tenant_id)
