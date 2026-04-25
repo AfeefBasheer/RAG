@@ -10,6 +10,9 @@ from app.document.repository.document_repository import (
 )
 from app.core.hash import hash_content
 from uuid import UUID
+from retry import classify_error_type
+from app.core.exception import JobFailureException
+
 
 
 def admit_text(text: TextSchema, user_id: UUID, tenant_id: UUID):
@@ -42,7 +45,7 @@ def mark_document_embedded(document_id: UUID, user_id: UUID, tenant_id: UUID):
 
 def remove_document_record(document_id: UUID, user_id: UUID, tenant_id: UUID):
 
-    error = None
+    errors = []
     point_delete_response = None
     document_delete_response = None
 
@@ -52,7 +55,14 @@ def remove_document_record(document_id: UUID, user_id: UUID, tenant_id: UUID):
         )
     except Exception as e:
         print("Remove Document failed at vector db")
-        error = str(e)
+        errors.append(
+            {
+                "error": str(e),
+                "target": "vector_db",
+                "type": type(e).__name__,
+                "retry": classify_error_type(e),
+            }
+        )
 
     try:
         document_delete_response = delete_document_by_document_id(
@@ -60,10 +70,17 @@ def remove_document_record(document_id: UUID, user_id: UUID, tenant_id: UUID):
         )
     except Exception as e:
         print("Remove Document failed at Postgres db")
-        error = str(e)
+        errors.append(
+            {
+                "error": str(e),
+                "target": "postgres_db",
+                "type": type(e).__name__,
+                "retry": classify_error_type(e),
+            }
+        )
 
-    if error:
-        raise Exception(error)
+    if errors:
+        raise JobFailureException(errors)
 
     return {
         "vector_db_response": point_delete_response,

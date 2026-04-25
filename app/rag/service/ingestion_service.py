@@ -16,33 +16,73 @@ from app.rag.service.embedding_service import insert_embeddings
 from app.rag.config.text_splitter_config import CHUNK_SIZE_v1, SENTENCE_OVERLAP_V1
 from app.rag.config.embedder_config import TIMEOUT, COLLECTION_NAME
 from uuid import UUID
+from app.core.exception import JobFailureException
+from retry import classify_error_type
 
 
 def ingest_document(document_id: UUID, user_id: UUID, tenant_id: UUID):
-    document = get_document_by_document_id(document_id, user_id, tenant_id)
-    if not document.document_id == document_id:
-        raise ValueError("Document Doesn't Exist")
 
-    chunk_response = fetch_chunks_by_document_id(document_id, user_id, tenant_id)
-    if not chunk_response:
-        raw_chunks = chunk_data_by_sentence(
-            document.content, CHUNK_SIZE_v1, SENTENCE_OVERLAP_V1
+    document = get_document_by_document_id(document_id, user_id, tenant_id)
+    if not document:
+        raise JobFailureException(
+            [
+                {
+                    "error": "Document not found",
+                    "target": "get_document",
+                    "type": "document not found",
+                    "retry": False,
+                }
+            ]
         )
-        chunk_response = insert_chunks(raw_chunks, document_id, user_id, tenant_id)
-        if chunk_response:
-            mark_document_chunked(document_id, user_id, tenant_id)
+
+    chunk_response = None
+    try:
+        chunk_response = fetch_chunks_by_document_id(document_id, user_id, tenant_id)
+        if not chunk_response:
+            raw_chunks = chunk_data_by_sentence(
+                document.content, CHUNK_SIZE_v1, SENTENCE_OVERLAP_V1
+            )
+            chunk_response = insert_chunks(raw_chunks, document_id, user_id, tenant_id)
+            if chunk_response:
+                mark_document_chunked(document_id, user_id, tenant_id)
+
+    except Exception as e:
+        raise JobFailureException(
+            [
+                {
+                    "error": str(e),
+                    "target": "chunking",
+                    "type": type(e).__name__,
+                    "retry": classify_error_type(e),
+                }
+            ]
+        )
 
     chunks = extract_chunk_content(chunk_response)
-    embedded_data = check_embeddings(
-        len(chunks), COLLECTION_NAME, document_id, user_id, tenant_id
-    )
-    if not embedded_data:
-        embeddings = embed_the_chunks(chunks, TIMEOUT)
-        embedded_data = insert_embeddings(
-            COLLECTION_NAME, chunk_response, embeddings, user_id, tenant_id
+
+    try:
+        embedded_data = check_embeddings(
+            len(chunks), COLLECTION_NAME, document_id, user_id, tenant_id
         )
-        if embedded_data:
-            mark_document_embedded(document_id, user_id, tenant_id)
+        if not embedded_data:
+            embeddings = embed_the_chunks(chunks, TIMEOUT)
+            embedded_data = insert_embeddings(
+                COLLECTION_NAME, chunk_response, embeddings, user_id, tenant_id
+            )
+            if embedded_data:
+                mark_document_embedded(document_id, user_id, tenant_id)
+
+    except Exception as e:
+        raise JobFailureException(
+            [
+                {
+                    "error": str(e),
+                    "target": "embedding",
+                    "type": type(e).__name__,
+                    "retry": classify_error_type(e),
+                }
+            ]
+        )
 
     return get_document_by_document_id(document_id, user_id, tenant_id)
 

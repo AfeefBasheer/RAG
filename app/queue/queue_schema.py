@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from uuid import UUID
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import List,Optional, Dict, Any
 
 class JobRecord(BaseModel):
     document_id:Optional[UUID]
@@ -14,4 +14,4 @@ class JobRecord(BaseModel):
     updated_at:datetime
     attempt:int
     payload:Optional[Dict[str, Any]]
-    error_message:Optional[str]
+    error: Optional[List[Dict[str, Any]]] = None
