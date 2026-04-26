@@ -10,7 +10,7 @@ import argparse
 from worker_config import JOB_HANDLER, MAX_ATTEMPT
 from app.core.exception import JobFailureException
 from retry import is_retryable
-
+from logger import log_event
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--name", default="worker-1")
@@ -40,7 +40,7 @@ def run_worker():
             continue
 
         job = None
-        job_status = "no status"
+        job_status = None
 
         if not response:
             time.sleep(10)
@@ -49,24 +49,52 @@ def run_worker():
         start = time.perf_counter()
         try:
             job = JobRecord(**response)
-            print(f"job.attempt = {job.attempt}")
-            print(f"job started : {job.job_id} by worker: {WORKER_NAME}")
+            log_event(
+                "job_started",
+                job_id=str(job.job_id),
+                job_type=job.job_type,
+                worker_name=WORKER_NAME,
+            )
             process_job(job)
             update_job_to_completed(job.job_id, job.attempt + 1)
-            job_status = "completed"
+            job_status = "job_completed"
 
         except JobFailureException as e:
             errors = e.errors
             if job and is_retryable(errors) and job.attempt < MAX_ATTEMPT:
-                update_job_to_retry(job.job_id,errors, job.attempt + 1)
-                print("updated the job to retry",job.job_id)
-                job_status = "retry"
+                update_job_to_retry(job.job_id, errors, job.attempt + 1)
+                log_event(
+                    "job_retry",
+                    job_id=str(job.job_id),
+                    job_type=job.job_type,
+                    worker_name=WORKER_NAME,
+                    attempt=job.attempt + 1,
+                    error_count=len(errors),
+                    targets=[e["target"] for e in errors],
+                    errors=errors  
+                )
+                job_status = "job_retry"
+
             elif job:
                 update_job_to_failed(job.job_id, errors, job.attempt)
-                job_status = "failed"
+                log_event(
+                    "job_failed",
+                    job_id=str(job.job_id),
+                    job_type=job.job_type,
+                    worker_name=WORKER_NAME,
+                    attempt=job.attempt,
+                    error_count=len(errors),
+                    targets=[e["target"] for e in errors],
+                    errors=errors  
+                )
+                job_status = "job_failed"
             else:
-                print(f"[{WORKER_NAME}] fatal error before job init: {e}")
-                job_status = "failed"
+                log_event(
+                    "fatal error before job init",
+                    worker_name=WORKER_NAME,
+                    error=str(e),
+                )
+                job_status = "job_failed"
 
         except Exception as e:
             if job:
@@ -83,13 +111,22 @@ def run_worker():
                     job.attempt + 1,
                 )
             else:
-                print(f"[{WORKER_NAME}] fatal error before job init: {e}")
-            job_status = "failed"
+                log_event(
+                    "fatal error before job init",
+                    worker_name=WORKER_NAME,
+                    error=str(e),
+                )
+            job_status = "job_failed"
         finally:
             end = time.perf_counter()
             if job:
-                print(
-                    f"job {job.job_id} {job_status} by worker: {WORKER_NAME}. Time took {end - start:.6f} seconds"
+                log_event(
+                    job_status,
+                    job_id=str(job.job_id),
+                    job_type=job.job_type,
+                    worker_name=WORKER_NAME,
+                    time_taken=round(end - start, 6),
+                    attempt=job.attempt + 1,
                 )
 
 

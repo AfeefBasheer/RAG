@@ -1,6 +1,9 @@
-# Python virtual environment
+# Virtual environment
 venv/
 .venv/
+
+# Logs
+*.log
 
 # Python cache
 __pycache__/
@@ -9,8 +12,15 @@ __pycache__/
 
 # Environment variables
 .env
+.env.*
 
-# OS junk
+# Local databases
+*.sqlite3
+*.db
+
+# OS files
 .DS_Store
+Thumbs.db
 
+# Temp / local scripts
 check.py
