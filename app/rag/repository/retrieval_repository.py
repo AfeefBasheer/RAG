@@ -1,5 +1,5 @@
 from app.database.vector_db import qdrant_client
-from qdrant_client.models import Filter, FieldCondition, MatchValue
+from qdrant_client.models import Filter, FieldCondition, MatchValue, MatchAny
 from app.database.postgres import supabase
 from postgrest.exceptions import APIError
 from app.rag.schema.retrieval_schema import QuerySchema
@@ -38,17 +38,29 @@ def insert_retrieved_chunks(retrieved_data):
 
 
 def retrieve_embeddings(
-    query_vector: str, COLLECTION_NAME: str, TOP_K: int, user_id: UUID, tenant_id: UUID
+    query_vector: str,
+    COLLECTION_NAME: str,
+    document_ids: list[UUID] | None,
+    TOP_K: int,
+    user_id: UUID,
+    tenant_id: UUID,
 ):
+    must_condition = [
+        FieldCondition(key="tenant_id", match=MatchValue(value=str(tenant_id))),
+        FieldCondition(key="user_id", match=MatchValue(value=str(user_id))),
+    ]
+    if document_ids:
+        must_condition.append(
+            FieldCondition(
+                key="document_id",
+                match=MatchAny(any=[str(doc_id) for doc_id in document_ids]),
+            )
+        )
+
     response = qdrant_client.query_points(
         collection_name=COLLECTION_NAME,
         query=query_vector,
         limit=TOP_K,
-        query_filter=Filter(
-            must=[
-                FieldCondition(key="tenant_id", match=MatchValue(value=str(tenant_id))),
-                FieldCondition(key="user_id", match=MatchValue(value=str(user_id))),
-            ]
-        ),
+        query_filter=Filter(must=must_condition),
     )
     return response.points
