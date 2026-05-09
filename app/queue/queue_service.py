@@ -1,29 +1,39 @@
 from app.queue.queue_repository import (
     create_job,
-    fetch_job,
+    fetch_embed_job,
+    fetch_general_job,
     update_job,
     get_job_by_job_id,
 )
 from uuid import UUID
 
 
-def enqueue_ingestion_job(document_id: UUID, user_id: UUID, tenant_id: UUID):
-    response = create_job("ingestion", document_id, user_id, tenant_id)
+def enqueue_chunk_job(document_id: UUID, user_id: UUID, tenant_id: UUID):
+    response = create_job("chunk_document", document_id, user_id, tenant_id)
     return response
 
 
-def dequeue_job():
-    response = fetch_job()
+def enqueue_embed_job(document_id: UUID, user_id: UUID, tenant_id: UUID):
+    response = create_job("embed_document", document_id, user_id, tenant_id)
     return response
 
 
-def update_job_to_completed(job_id: UUID,attempt_count:int):
-    response = update_job("completed", job_id,None,attempt_count)
+def dequeue_embed_job():
+    response = fetch_embed_job()
+    return response
+
+def dequeue_general_job():
+    response = fetch_general_job()
     return response
 
 
-def update_job_to_failed(job_id: UUID, errors: list,attempt_count:int):
-    response = update_job("failed", job_id, errors,attempt_count)
+def update_job_to_completed(job_id: UUID, attempt_count: int):
+    response = update_job("completed", job_id, None, attempt_count)
+    return response
+
+
+def update_job_to_failed(job_id: UUID, errors: list, attempt_count: int):
+    response = update_job("failed", job_id, errors, attempt_count)
     return response
 
 
@@ -31,10 +41,12 @@ def get_job(job_id: UUID, user_id: UUID, tenant_id: UUID):
     response = get_job_by_job_id(job_id, user_id, tenant_id)
     return response
 
-def update_job_to_retry(job_id:UUID,errors:list,attempt_count:int):
-    response = update_job("retry",job_id,errors,attempt_count)
+
+def update_job_to_retry(job_id: UUID, errors: list, attempt_count: int):
+    response = update_job("retry", job_id, errors, attempt_count)
     return response
 
-def enqueue_document_deletion_job(document_id:UUID,user_id:UUID,tenant_id:UUID):
-    response = create_job('delete_document',document_id,user_id,tenant_id)
+
+def enqueue_document_deletion_job(document_id: UUID, user_id: UUID, tenant_id: UUID):
+    response = create_job("delete_document", document_id, user_id, tenant_id)
     return response
