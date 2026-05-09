@@ -10,7 +10,7 @@ from app.document.repository.document_repository import (
 )
 from app.core.hash import hash_content
 from uuid import UUID
-from retry import classify_error_type
+from worker.retry import classify_error_type
 from app.core.exception import JobFailureException
 
 
@@ -43,8 +43,11 @@ def mark_document_embedded(document_id: UUID, user_id: UUID, tenant_id: UUID):
     return update_document_status("embedded", document_id, user_id, tenant_id)
 
 
-def remove_document_record(document_id: UUID, user_id: UUID, tenant_id: UUID):
-
+def remove_document_record(record):
+    document_id = record.document_id
+    user_id = record.user_id
+    tenant_id = record.tenant_id
+    
     errors = []
     point_delete_response = None
     document_delete_response = None

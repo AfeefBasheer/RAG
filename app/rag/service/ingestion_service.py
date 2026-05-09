@@ -17,12 +17,14 @@ from app.rag.config.text_splitter_config import CHUNK_SIZE_v1, SENTENCE_OVERLAP_
 from app.rag.config.embedder_config import TIMEOUT, COLLECTION_NAME
 from uuid import UUID
 from app.core.exception import JobFailureException
-from retry import classify_error_type
+from worker.retry import classify_error_type
+from app.queue.queue_service import enqueue_chunk_job,enqueue_embed_job
+
 
 
 def ingest_document(document_id: UUID, user_id: UUID, tenant_id: UUID):
-
     document = get_document_by_document_id(document_id, user_id, tenant_id)
+
     if not document:
         raise JobFailureException(
             [
@@ -34,8 +36,19 @@ def ingest_document(document_id: UUID, user_id: UUID, tenant_id: UUID):
                 }
             ]
         )
+    
+    response = enqueue_chunk_job(document_id,user_id,tenant_id)
+    return response
 
+
+def chunk_document(record):
+    document_id = record.document_id
+    user_id = record.user_id
+    tenant_id = record.tenant_id
+    
+    document = get_document_by_document_id(document_id, user_id, tenant_id)
     chunk_response = None
+
     try:
         chunk_response = fetch_chunks_by_document_id(document_id, user_id, tenant_id)
         if not chunk_response:
@@ -45,7 +58,6 @@ def ingest_document(document_id: UUID, user_id: UUID, tenant_id: UUID):
             chunk_response = insert_chunks(raw_chunks, document_id, user_id, tenant_id)
             if chunk_response:
                 mark_document_chunked(document_id, user_id, tenant_id)
-
     except Exception as e:
         raise JobFailureException(
             [
@@ -57,8 +69,29 @@ def ingest_document(document_id: UUID, user_id: UUID, tenant_id: UUID):
                 }
             ]
         )
+        
+    response = enqueue_embed_job(document_id,user_id,tenant_id)
+    return response
 
+
+def embed_document(record):
+    document_id = record.document_id
+    user_id = record.user_id
+    tenant_id = record.tenant_id
+    
+    chunk_response = fetch_chunks_by_document_id(document_id, user_id, tenant_id)
     chunks = extract_chunk_content(chunk_response)
+    if not chunks:
+        raise JobFailureException(
+            [
+                {
+                    "error": str(e),
+                    "target": "embedding",
+                    "type": type(e).__name__,
+                    "retry": classify_error_type(e),
+                }
+            ]
+        )
 
     try:
         embedded_data = check_embeddings(
@@ -69,8 +102,9 @@ def ingest_document(document_id: UUID, user_id: UUID, tenant_id: UUID):
             embedded_data = insert_embeddings(
                 COLLECTION_NAME, chunk_response, embeddings, user_id, tenant_id
             )
-            if embedded_data:
-                mark_document_embedded(document_id, user_id, tenant_id)
+
+        if embedded_data:
+            mark_document_embedded(document_id, user_id, tenant_id)
 
     except Exception as e:
         raise JobFailureException(

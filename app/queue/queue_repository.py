@@ -19,9 +19,20 @@ def create_job(job_type, document_id: UUID, user_id: UUID, tenant_id: UUID):
         raise
 
 
-def fetch_job():
+def fetch_embed_job():
     try:
-        response = supabase.rpc("fetch_and_lock").execute()
+        response = supabase.rpc("fetch_and_lock_embed_job").execute()
+        if response.data:
+            return response.data[0]
+        else:
+            return None
+    except APIError as error:
+        print("Error at fetch_job", error)
+        raise
+
+def fetch_general_job():
+    try:
+        response = supabase.rpc("fetch_and_lock_general_job").execute()
         if response.data:
             return response.data[0]
         else:
