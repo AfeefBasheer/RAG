@@ -24,3 +24,5 @@ Thumbs.db
 
 # Temp / local scripts
 check.py
+
+debug.json

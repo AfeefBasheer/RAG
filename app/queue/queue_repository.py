@@ -6,7 +6,7 @@ from uuid import UUID
 def create_job(job_type, document_id: UUID, user_id: UUID, tenant_id: UUID):
     try:
         return supabase.rpc(
-            "create_job_if_not_active",
+            "create_job",
             {
                 "p_job_type": job_type,
                 "p_document_id": str(document_id),
