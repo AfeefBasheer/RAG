@@ -32,29 +32,51 @@ class QueryRecord(BaseModel):
 class RetrievalRow(BaseModel):
     tenant_id: UUID
     user_id: UUID
-    content: StrictStr  # strings are allowed,
     query_id: UUID
-    content_hash: str
+    content: str
     chunk_id: UUID
     document_id: UUID
     vector_score: float
 
-
-class RetrievalRowRecord(BaseModel):
-    query_id: UUID
-    user_id: UUID
-    content_hash: str
+class RetrievalBody(BaseModel):
     tenant_id: UUID
+    user_id: UUID
+    query_id: UUID
     chunk_id: UUID
     document_id: UUID
     vector_score: float
-    created_at: datetime
-
-
-class RetrievedChunksRecord(BaseModel):
-    rows: list[RetrievalRowRecord]
-
 
 class RetrievalResponse(BaseModel):
     query: str
     context: list[RetrievalRow]
+    reranked_chunks: bool
+
+
+class RerankedChunkRow(BaseModel):
+    query_id: UUID
+    retrieved_chunk_id: UUID
+    chunk_id: UUID
+    user_id: UUID
+    tenant_id: UUID
+    document_id: UUID
+    reranked_score: float
+
+
+class RerankedChunkList(BaseModel):
+    chunks: List[RerankedChunkRow]
+
+
+class RerankedRow(BaseModel):
+    tenant_id: UUID
+    user_id: UUID
+    query_id: UUID
+    content:StrictStr
+    chunk_id: UUID
+    document_id: UUID
+    reranked_score: float
+
+
+class RerankedResponse(BaseModel):
+    query: str
+    context: list[RerankedRow]
+    reranked_chunks: bool

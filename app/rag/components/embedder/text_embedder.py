@@ -6,11 +6,10 @@ import os
 load_dotenv()
 
 API_URL = os.getenv("EMBEDDER_API_URL")
-EMBEDDER_KEY = os.getenv("EMBEDDER_TOKEN")
+EMBEDDER_KEY = os.getenv("HF_TOKEN")
 headers = {"Authorization": f"Bearer {EMBEDDER_KEY}"}
 
-
-def embed_the_chunks(chunks: list, TIMEOUT=60) -> list:
+def embed_the_chunks(chunks: list,TIMEOUT: int) -> list:
     validated_batches = validate_chunks(chunks)
     total_embeddings = []
     for validated_chunks in validated_batches:
