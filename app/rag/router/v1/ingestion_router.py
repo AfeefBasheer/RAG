@@ -8,6 +8,6 @@ ingestion_router = APIRouter()
 
 
 @ingestion_router.post("/ingest/{document_id}")
-def ingest_endpoint(document_id: UUID, user: UserBody = Depends(get_current_user)):
-    response = ingest_document(document_id,user.user_id,user.tenant_id)
+async def ingest_endpoint(document_id: UUID, user: UserBody = Depends(get_current_user)):
+    response = await ingest_document(document_id,user.user_id,user.tenant_id)
     return response

@@ -1,92 +1,129 @@
-from app.database.postgres import supabase
-from postgrest.exceptions import APIError
-from app.document.schema.document_schema import DocumentRecord, DocumentStatus, Document
 from uuid import UUID
 
+from app.database.postgres import pool
+from app.document.schema.document_schema import (
+    DocumentRecord,
+    DocumentStatus,
+)
 
-def insert_document(document: DocumentRecord):
-    try:
-        return (
-            supabase.table("documents")
-            .insert(
-                {
-                    "source_type": document.source_type,
-                    "tenant_id": str(document.tenant_id),
-                    "user_id": str(document.user_id),
-                    "content": document.content,
-                    "content_hash": document.content_hash,
-                    "status": document.status,
-                }
-            )
-            .execute()
+
+async def insert_document(document: DocumentRecord):
+    QUERY = """
+        INSERT INTO documents (
+            source_type,
+            tenant_id,
+            user_id,
+            content,
+            content_hash,
+            status
         )
-    except APIError as error:
-        print("Error at insert_document", error)
-        raise
+        VALUES (%s, %s, %s, %s, %s, %s)
+        RETURNING *
+    """
+
+    values = (
+        document.source_type,
+        document.tenant_id,
+        document.user_id,
+        document.content,
+        document.content_hash,
+        document.status,
+    )
+
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(QUERY, values)
+            result = await cur.fetchone()
+            await conn.commit()
+            return result
 
 
-def get_document_by_content_hash(content_hash: str, user_id: UUID, tenant_id: UUID):
-    try:
-        return (
-            supabase.table("documents")
-            .select("*")
-            .eq("content_hash", content_hash)
-            .eq("tenant_id", tenant_id)
-            .eq("user_id", user_id)
-            .single()
-            .execute()
-        )
-    except APIError as error:
-        print("Error at get_document_by_content_hash", error)
-        raise
-
-
-def get_document_by_document_id(document_id: UUID, user_id: UUID, tenant_id: UUID):
-    try:
-        response = (
-            supabase.table("documents")
-            .select("*")
-            .eq("document_id", document_id)
-            .eq("user_id", user_id)
-            .eq("tenant_id", tenant_id)
-            .single()
-            .execute()
-        ).data
-        return Document(**response)
-    except APIError as error:
-        print("Error at get_document_by_document_id", error)
-        raise
-
-
-def update_document_status(
-    status: DocumentStatus, document_id: UUID, user_id: UUID, tenant_id: UUID
+async def get_document_by_content_hash(
+    content_hash: str,
+    user_id: UUID,
+    tenant_id: UUID,
 ):
-    try:
-        return (
-            supabase.table("documents")
-            .update({"status": status})
-            .eq("document_id", document_id)
-            .eq("user_id", user_id)
-            .eq("tenant_id", tenant_id)
-            .execute()
-        ).data
-    except APIError as error:
-        print("Error at update_document_status", error)
-        raise
+    QUERY = """
+        SELECT *
+        FROM documents
+        WHERE content_hash = %s
+          AND user_id = %s
+          AND tenant_id = %s
+    """
+
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                QUERY,
+                (content_hash, user_id, tenant_id),
+            )
+            return await cur.fetchone()
 
 
-def delete_document_by_document_id(document_id: UUID, user_id: UUID, tenant_id: UUID):
-    try:
-        response = (
-            supabase.table("documents")
-            .delete()
-            .eq("document_id", document_id)
-            .eq("user_id", user_id)
-            .eq("tenant_id", tenant_id)
-            .execute()
-            .data
-        )
-        return response
-    except APIError as error:
-        print("Error at delete_document_by_document_id", error)
-        raise
+async def get_document_by_document_id(
+    document_id: UUID,
+    user_id: UUID,
+    tenant_id: UUID,
+):
+    QUERY = """
+        SELECT *
+        FROM documents
+        WHERE document_id = %s
+          AND user_id = %s
+          AND tenant_id = %s
+    """
+
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                QUERY,
+                (document_id, user_id, tenant_id),
+            )
+            return await cur.fetchone()
+
+
+async def update_document_status(
+    status: DocumentStatus,
+    document_id: UUID,
+    user_id: UUID,
+    tenant_id: UUID,
+):
+    QUERY = """
+        UPDATE documents
+        SET status = %s
+        WHERE document_id = %s
+          AND user_id = %s
+          AND tenant_id = %s
+        RETURNING *
+    """
+
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                QUERY,
+                (status, document_id, user_id, tenant_id),
+            )
+            result = await cur.fetchone()
+            await conn.commit()
+            return result
+
+
+async def delete_document_by_document_id(
+    document_id: UUID,
+    user_id: UUID,
+    tenant_id: UUID,
+):
+    QUERY = """
+        DELETE FROM documents
+        WHERE document_id = %s
+          AND user_id = %s
+          AND tenant_id = %s
+    """
+
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                QUERY,
+                (document_id, user_id, tenant_id),
+            )
+            await conn.commit()

@@ -5,6 +5,8 @@ venv/
 # Logs
 *.log
 
+bulk.py
+test_db.py
 # Python cache
 __pycache__/
 *.pyc

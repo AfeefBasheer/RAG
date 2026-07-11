@@ -8,8 +8,8 @@ from app.auth.auth_schema import UserBody
 document_router = APIRouter()
 
 @document_router.delete('/document/{document_id}')
-def delete_document_endpoint(document_id: UUID,user:UserBody =Depends(get_current_user)):
-    response= enqueue_document_deletion_job(document_id,user.user_id,user.tenant_id)
+async def delete_document_endpoint(document_id: UUID,user:UserBody =Depends(get_current_user)):
+    response= await enqueue_document_deletion_job(document_id,user.user_id,user.tenant_id)
     return response
     
 document_router.include_router(text_router)

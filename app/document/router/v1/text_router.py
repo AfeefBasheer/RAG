@@ -8,8 +8,8 @@ text_router = APIRouter()
 
 
 @text_router.post("/text")
-def register_text_endpoint(
+async def register_text_endpoint(
     text: TextRequestSchema, user: UserBody = Depends(get_current_user)
 ):
-    response = admit_text(text, user.user_id, user.tenant_id)
+    response = await admit_text(text, user.user_id, user.tenant_id)
     return response

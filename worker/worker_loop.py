@@ -4,14 +4,15 @@ from app.queue.queue_service import (
     update_job_to_retry,
 )
 
-import time
+import asyncio
 from app.queue.queue_schema import JobRecord
 from app.core.exception import JobFailureException
 from worker.retry import is_retryable
 from logger import log_event
+from app.database.postgres import pool
 
 
-def process_job(job_record, JOB_HANDLER, WORKER_NAME):
+async def process_job(job_record, JOB_HANDLER, WORKER_NAME):
     job_name = job_record.job_type
     job = JOB_HANDLER.get(job_name)
 
@@ -19,17 +20,18 @@ def process_job(job_record, JOB_HANDLER, WORKER_NAME):
         print(f"no handler found for job type: {job_name} by worker: {WORKER_NAME}")
         raise Exception(f"No handler for job type: {job_name}")
 
-    job(job_record)
+    await job(job_record)
 
 
-def run_worker_loop(WORKER_NAME, JOB_HANDLER, fetch_next_job, MAX_ATTEMPT):
+async def run_worker_loop(WORKER_NAME, JOB_HANDLER, fetch_next_job, MAX_ATTEMPT):
     while True:
         response = None
         try:
-            response = fetch_next_job()
+            await pool.open()
+            response = await fetch_next_job()
         except Exception as e:
             print(f"[{WORKER_NAME}] failed to dequeue: {e}, retrying in 3s")
-            time.sleep(3)
+            await asyncio.sleep(3)
             continue
 
         job = None
@@ -37,10 +39,10 @@ def run_worker_loop(WORKER_NAME, JOB_HANDLER, fetch_next_job, MAX_ATTEMPT):
         errors = None
 
         if not response:
-            time.sleep(3)
+            await asyncio.sleep(3)
             continue
 
-        start = time.perf_counter()
+        start = asyncio.get_running_loop().time()
         try:
             job = JobRecord(**response)
             log_event(
@@ -50,15 +52,16 @@ def run_worker_loop(WORKER_NAME, JOB_HANDLER, fetch_next_job, MAX_ATTEMPT):
                 worker_name=WORKER_NAME,
             )
             print("job started", job.job_id, job.job_type, WORKER_NAME)
-            process_job(job, JOB_HANDLER, WORKER_NAME)
-            update_job_to_completed(job.job_id, job.attempt + 1)
+            await process_job(job, JOB_HANDLER, WORKER_NAME)
+            await update_job_to_completed(job.job_id, job.attempt + 1)
             job_status = "job_completed"
 
         except JobFailureException as e:
             errors = e.errors
+            print(f"[{WORKER_NAME}] job failed: {errors}, job_id: {job.job_id}")
             if job and is_retryable(errors) and job.attempt < MAX_ATTEMPT:
                 try:
-                    update_job_to_retry(job.job_id, errors, job.attempt + 1)
+                    await update_job_to_retry(job.job_id, errors, job.attempt + 1)
                     job_status = "job_retry"
                 except Exception as e:
                     print(
@@ -73,7 +76,7 @@ def run_worker_loop(WORKER_NAME, JOB_HANDLER, fetch_next_job, MAX_ATTEMPT):
 
             elif job:
                 try:
-                    update_job_to_failed(job.job_id, errors, job.attempt)
+                    await update_job_to_failed(job.job_id, errors, job.attempt)
                     job_status = "job_failed"
                 except Exception as e:
                     print(
@@ -90,9 +93,10 @@ def run_worker_loop(WORKER_NAME, JOB_HANDLER, fetch_next_job, MAX_ATTEMPT):
                 job_status = "job_failed"
 
         except Exception as e:
+            print(f"[{WORKER_NAME}] job failed: {errors}, job_id: {job.job_id}")
             if job:
                 try:
-                    update_job_to_failed(
+                    await update_job_to_failed(
                         job.job_id,
                         [
                             {
@@ -114,7 +118,7 @@ def run_worker_loop(WORKER_NAME, JOB_HANDLER, fetch_next_job, MAX_ATTEMPT):
                     )
             job_status = "job_failed"
         finally:
-            end = time.perf_counter()
+            end = asyncio.get_running_loop().time()
             if job:
                 log_event(
                     job_status,

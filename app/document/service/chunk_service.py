@@ -8,11 +8,11 @@ from app.document.schema.chunk_schema import RawChunkRecord, ChunkRecord
 from app.core.hash import hash_content
 
 
-def fetch_chunks_by_document_id(document_id: UUID, user_id: UUID, tenant_id: UUID):
-    return get_chunks_by_document_id(document_id, user_id, tenant_id)
+async def fetch_chunks_by_document_id(document_id: UUID, user_id: UUID, tenant_id: UUID):
+    return await get_chunks_by_document_id(document_id, user_id, tenant_id)
 
 
-def insert_chunks(
+async def insert_chunks(
     raw_chunks: list[RawChunkRecord], document_id: UUID, user_id: UUID, tenant_id: UUID
 ):
     chunks: list[ChunkRecord] = []
@@ -33,9 +33,9 @@ def insert_chunks(
         chunks.append(chunk)
     rows = [chunk.model_dump(mode="json") for chunk in chunks]
 
-    response = create_chunks(rows)
+    response = await create_chunks(rows)
     return response
 
-def retrieve_chunks(chunk_ids:list,user_id:UUID,tenant_id:UUID):
-    response = fetch_chunks_by_chunk_ids(chunk_ids,user_id,tenant_id)
+async def retrieve_chunks(chunk_ids:list,user_id:UUID,tenant_id:UUID):
+    response = await fetch_chunks_by_chunk_ids(chunk_ids,user_id,tenant_id)
     return response

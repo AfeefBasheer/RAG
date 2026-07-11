@@ -9,7 +9,6 @@ from app.rag.schema.retrieval_schema import (
     RerankedResponse
 )
 
-import json
 
 from uuid import UUID
 from app.rag.components.embedder.text_embedder import embed_the_query
@@ -33,12 +32,12 @@ from app.core.vector_normalizer import normalize
 from app.rag.components.reranker.vector_reranker import rerank_the_vector
 
 
-def retrieve_data(query: QueryRequestSchema, user_id: UUID, tenant_id: UUID):
+async def retrieve_data(query: QueryRequestSchema, user_id: UUID, tenant_id: UUID):
     normalized_query_content = normalize_text(query.content)
     normalized_query = QuerySchema(
         content=normalized_query_content, user_id=user_id, tenant_id=tenant_id
     )
-    stored_query = QueryRecord(**insert_query(normalized_query))
+    stored_query = QueryRecord(**await insert_query(normalized_query))
     query_embedding = embed_the_query(stored_query.content, TIMEOUT)
     query_embedding = normalize(query_embedding)
     retrieved_embeddings = retrieve_embeddings(
@@ -62,11 +61,11 @@ def retrieve_data(query: QueryRequestSchema, user_id: UUID, tenant_id: UUID):
             query=normalized_query_content, context=[], reranked_chunks=False
         )
 
-    retrieved_rows = insert_retrieved_chunks(retrieved_chunks_with_query_id)
+    await insert_retrieved_chunks(retrieved_chunks_with_query_id)
     reranked_chunks_with_content = None
     try:
         # raise Exception("Reranking failed due to timeout")  # Simulating reranking failure for testing fallback mechanism
-        retrieved_chunks_with_content = (
+        retrieved_chunks_with_content = await (
             retrieve_chunks_with_chunk_content_from_query_id(
                 stored_query.query_id, user_id, tenant_id
             )
@@ -82,7 +81,7 @@ def retrieve_data(query: QueryRequestSchema, user_id: UUID, tenant_id: UUID):
             stored_query.query_id, normalized_chunks, user_id, tenant_id
         )
         reranked_chunks_row = RerankedChunkList(chunks=reranked_chunks_with_query_id)
-        reranked_chunks_response = insert_reranked_chunks(reranked_chunks_row)
+        reranked_chunks_response = await insert_reranked_chunks(reranked_chunks_row)
         reranked_chunks_with_content = attach_content_to_reranked_chunks(reranked_chunks_response, retrieved_chunks_with_content)
 
     except Exception as error:
@@ -95,7 +94,7 @@ def retrieve_data(query: QueryRequestSchema, user_id: UUID, tenant_id: UUID):
             reranked_chunks=True,
         )
 
-    top_fall_back_retrieved_chunks = fetch_top_retrieved_chunks(
+    top_fall_back_retrieved_chunks = await fetch_top_retrieved_chunks(
         stored_query.query_id, FALLBACK_TOP_K, user_id, tenant_id
     )
 
@@ -110,7 +109,7 @@ def attach_content_to_reranked_chunks(reranked_chunks_response, retrieved_chunks
     }
     for chunk in retrieved_chunks_with_content:
         chunk_id_str = str(chunk["chunk_id"])
-        retrieved_chunks_dict[chunk_id_str] = chunk["chunks"]["content"]
+        retrieved_chunks_dict[chunk_id_str] = chunk["content"]
     for chunk in reranked_chunks_response:
         chunk_id_str = str(chunk["chunk_id"])
         chunk["content"] = retrieved_chunks_dict.get(chunk_id_str, "")
@@ -188,7 +187,7 @@ def attach_query_id_to_reranked_chunks(
 
 def extract_chunk_content_reranking(db_chunks: list) -> list:
     return [
-        chunk["chunks"]["content"]
+        chunk["content"]
         for chunk in db_chunks
-        if chunk.get("chunks") and chunk["chunks"].get("content")
+        if chunk.get("content")
     ]
