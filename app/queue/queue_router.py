@@ -8,6 +8,6 @@ from app.auth.auth_schema import UserBody
 queue_router = APIRouter()
 
 @queue_router.get('/job/{job_id}')
-def fetch_job_endpoint(job_id:UUID,user: UserBody = Depends(get_current_user)):
-    response = get_job(job_id,user.user_id,user.tenant_id)
+async def fetch_job_endpoint(job_id:UUID,user: UserBody = Depends(get_current_user)):
+    response = await get_job(job_id,user.user_id,user.tenant_id)
     return response

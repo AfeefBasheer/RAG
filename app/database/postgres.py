@@ -1,23 +1,20 @@
-import httpx
 import os
-from supabase import create_client, Client, ClientOptions
+
 from dotenv import load_dotenv
+from psycopg.rows import dict_row
+from psycopg_pool import AsyncConnectionPool
 
 load_dotenv()
 
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-def _require_env(name: str) -> str:
-    value = os.getenv(name)
-    if not value:
-        raise RuntimeError(f"Missing required environment variable: {name}")
-    return value
-
-
-SUPABASE_URL = _require_env("SUPABASE_URL")
-SUPABASE_KEY = _require_env("SUPABASE_KEY")
-
-supabase = create_client(
-    SUPABASE_URL,
-    SUPABASE_KEY,
-    options=ClientOptions(httpx_client=httpx.Client(http2=False)),
+pool = AsyncConnectionPool(
+    conninfo=DATABASE_URL,
+    min_size=1,
+    max_size=10,
+    open=False,
+    kwargs={
+        "autocommit": False,
+        "row_factory": dict_row,
+    },
 )

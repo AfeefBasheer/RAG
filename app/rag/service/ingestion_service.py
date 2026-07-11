@@ -3,7 +3,7 @@ from app.rag.service.embedding_service import check_embeddings
 from app.rag.components.text_splitter.chunker import chunk_data_by_sentence
 
 from app.document.service.document_service import (
-    get_document_by_document_id,
+    fetch_document_by_document_id,
     mark_document_chunked,
     mark_document_embedded,
 )
@@ -21,8 +21,8 @@ from worker.retry import classify_error_type
 from app.queue.queue_service import enqueue_chunk_job, enqueue_embed_job
 
 
-def ingest_document(document_id: UUID, user_id: UUID, tenant_id: UUID):
-    document = get_document_by_document_id(document_id, user_id, tenant_id)
+async def ingest_document(document_id: UUID, user_id: UUID, tenant_id: UUID):
+    document = await fetch_document_by_document_id(document_id, user_id, tenant_id)
 
     if not document:
         raise JobFailureException(
@@ -36,27 +36,26 @@ def ingest_document(document_id: UUID, user_id: UUID, tenant_id: UUID):
             ]
         )
 
-    response = enqueue_chunk_job(document_id, user_id, tenant_id)
+    response = await enqueue_chunk_job(document_id, user_id, tenant_id)
     return response
 
 
-def chunk_document(record):
+async def chunk_document(record):
     document_id = record.document_id
     user_id = record.user_id
     tenant_id = record.tenant_id
 
-    document = get_document_by_document_id(document_id, user_id, tenant_id)
+    document = await fetch_document_by_document_id(document_id, user_id, tenant_id)
     chunk_response = None
 
     try:
-        chunk_response = fetch_chunks_by_document_id(document_id, user_id, tenant_id)
+        chunk_response = await fetch_chunks_by_document_id(document_id, user_id, tenant_id)
         if not chunk_response:
             raw_chunks = chunk_data_by_sentence(
-                document.content, CHUNK_SIZE_v1, SENTENCE_OVERLAP_V1
+                document["content"], CHUNK_SIZE_v1, SENTENCE_OVERLAP_V1
             )
-            chunk_response = insert_chunks(raw_chunks, document_id, user_id, tenant_id)
-        if chunk_response:
-            mark_document_chunked(document_id, user_id, tenant_id)
+            await insert_chunks(raw_chunks, document_id, user_id, tenant_id)
+        await mark_document_chunked(document_id, user_id, tenant_id)
     except Exception as e:
         raise JobFailureException(
             [
@@ -68,16 +67,16 @@ def chunk_document(record):
                 }
             ]
         )
-    response = enqueue_embed_job(document_id, user_id, tenant_id)
+    response = await enqueue_embed_job(document_id, user_id, tenant_id)
     return response
 
 
-def embed_document(record):
+async def embed_document(record):
     document_id = record.document_id
     user_id = record.user_id
     tenant_id = record.tenant_id
 
-    chunk_response = fetch_chunks_by_document_id(document_id, user_id, tenant_id)
+    chunk_response = await fetch_chunks_by_document_id(document_id, user_id, tenant_id)
     chunks = extract_chunk_content(chunk_response)
     if not chunks:
         raise JobFailureException(
@@ -102,9 +101,10 @@ def embed_document(record):
             )
 
         if embedded_data:
-            mark_document_embedded(document_id, user_id, tenant_id)
+            await mark_document_embedded(document_id, user_id, tenant_id)
 
     except Exception as e:
+        print(e)
         raise JobFailureException(
             [
                 {
@@ -116,7 +116,7 @@ def embed_document(record):
             ]
         )
 
-    return get_document_by_document_id(document_id, user_id, tenant_id)
+    return await fetch_document_by_document_id(document_id, user_id, tenant_id)
 
 
 def extract_chunk_content(db_chunks: list) -> list:

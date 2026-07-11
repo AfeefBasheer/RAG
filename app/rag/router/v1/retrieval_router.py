@@ -9,8 +9,8 @@ retrieval_router = APIRouter()
 
 
 @retrieval_router.post("/retrieve")
-def ingest_endpoint(
+async def ingest_endpoint(
     query: QueryRequestSchema, user: UserBody = Depends(get_current_user)
 ):
-    response = retrieve_data(query, user.user_id, user.tenant_id)
+    response = await retrieve_data(query, user.user_id, user.tenant_id)
     return response

@@ -1,181 +1,294 @@
-from app.database.vector_db import qdrant_client
-from qdrant_client.models import Filter, FieldCondition, MatchValue, MatchAny
-from app.database.postgres import supabase
-from postgrest.exceptions import APIError
-from app.rag.schema.retrieval_schema import QuerySchema,RerankedChunkList
 from uuid import UUID
 
+from qdrant_client.models import (
+    Filter,
+    FieldCondition,
+    MatchAny,
+    MatchValue,
+)
 
-def insert_query(query: QuerySchema):
-    try:
-        response = (
-            supabase.table("query")
-            .insert(
-                {
-                    "content": query.content,
-                    "user_id": str(query.user_id),
-                    "tenant_id": str(query.tenant_id),
-                }
+from app.database.postgres import pool
+from app.database.vector_db import qdrant_client
+from app.rag.schema.retrieval_schema import (
+    QuerySchema,
+    RerankedChunkList,
+    RetrievalBody,
+)
+
+
+# ==========================================================
+# QUERIES
+# ==========================================================
+
+async def insert_query(query: QuerySchema):
+    query_sql = """
+    INSERT INTO query (
+        content,
+        user_id,
+        tenant_id
+    )
+    VALUES (%s, %s, %s)
+    RETURNING *
+    """
+
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                query_sql,
+                (
+                    query.content,
+                    query.user_id,
+                    query.tenant_id,
+                ),
             )
-            .execute()
+            return await cur.fetchone()
+
+
+# ==========================================================
+# RETRIEVED CHUNKS
+# ==========================================================
+
+async def insert_retrieved_chunks(
+    retrieved_chunks: list[RetrievalBody],
+):
+
+    query_sql = """
+    INSERT INTO retrieved_chunks (
+        query_id,
+        chunk_id,
+        document_id,
+        vector_score,
+        user_id,
+        tenant_id
+    )
+    VALUES (%s, %s, %s, %s, %s, %s)
+    """
+
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.executemany(
+                query_sql,
+                [
+                    (
+                        chunk.query_id,
+                        chunk.chunk_id,
+                        chunk.document_id,
+                        chunk.vector_score,
+                        chunk.user_id,
+                        chunk.tenant_id
+                    )
+                    for chunk in retrieved_chunks
+                ],
+            )
+
+        await conn.commit()
+
+    return True
+
+
+# ==========================================================
+# RERANKED CHUNKS
+# ==========================================================
+
+async def insert_reranked_chunks(
+    reranked_chunks: RerankedChunkList,
+):
+    query_sql = """
+    INSERT INTO reranked_chunks (
+        query_id,
+        document_id,
+        retrieved_chunk_id,
+        chunk_id,
+        reranked_score,
+        user_id,
+        tenant_id
+    )
+    VALUES (%s, %s, %s, %s, %s, %s, %s)
+    RETURNING reranked_chunk_id, query_id, document_id, retrieved_chunk_id, chunk_id, reranked_score, user_id, tenant_id
+    """
+
+    rows = [
+        (
+            chunk.query_id,
+            chunk.document_id,
+            chunk.retrieved_chunk_id,
+            chunk.chunk_id,
+            chunk.reranked_score,
+            chunk.user_id,
+            chunk.tenant_id,
         )
-        return response.data[0]
-    except APIError as error:
-        print("Error at insert query", error)
+        for chunk in reranked_chunks.chunks
+    ]
+    inserted = []
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.executemany(
+                query_sql,
+                rows,
+                returning=True
+            )
+            while True:
+                inserted.extend(await cur.fetchall())
+                if not cur.nextset():
+                    break
+
+        await conn.commit()
+
+    return inserted
 
 
-def insert_retrieved_chunks(retrieved_data):
-    try:
-        rows = [row.model_dump(mode="json") for row in retrieved_data]
-
-        response = supabase.table("retrieved_chunks").insert(rows).execute()
-
-        return response.data
-
-    except APIError as error:
-        print("Error at insert retrieved data", error)
-        raise
-
-
-def insert_reranked_chunks(reranked_chunks: RerankedChunkList):
-    try:
-        rows = reranked_chunks.model_dump(mode="json")["chunks"]
-
-        response = (
-            supabase
-            .table("reranked_chunks")
-            .insert(rows)
-            .execute()
-        )
-
-        return response.data
-
-    except APIError as error:
-        print("Error at insert reranked data", error)
-        raise
-
+# ==========================================================
+# VECTOR RETRIEVAL
+# ==========================================================
 
 def retrieve_embeddings(
-    query_vector: str,
-    COLLECTION_NAME: str,
+    query_vector: list[float],
+    collection_name: str,
     document_ids: list[UUID] | None,
-    TOP_K_RETRIEVAL: int,
+    top_k_retrieval: int,
     user_id: UUID,
     tenant_id: UUID,
 ):
-    must_condition = [
-        FieldCondition(key="tenant_id", match=MatchValue(value=str(tenant_id))),
-        FieldCondition(key="user_id", match=MatchValue(value=str(user_id))),
+    must_conditions = [
+        FieldCondition(
+            key="tenant_id",
+            match=MatchValue(value=str(tenant_id)),
+        ),
+        FieldCondition(
+            key="user_id",
+            match=MatchValue(value=str(user_id)),
+        ),
     ]
+
     if document_ids:
-        must_condition.append(
+        must_conditions.append(
             FieldCondition(
                 key="document_id",
-                match=MatchAny(any=[str(doc_id) for doc_id in document_ids]),
+                match=MatchAny(
+                    any=[
+                        str(doc_id)
+                        for doc_id in document_ids
+                    ]
+                ),
             )
         )
 
     response = qdrant_client.query_points(
-        collection_name=COLLECTION_NAME,
+        collection_name=collection_name,
         query=query_vector,
-        limit=TOP_K_RETRIEVAL,
-        query_filter=Filter(must=must_condition),
+        limit=top_k_retrieval,
+        query_filter=Filter(
+            must=must_conditions
+        ),
     )
+
     return response.points
 
 
+# ==========================================================
+# FETCH RETRIEVED CHUNKS BY QUERY
+# ==========================================================
 
-def retrieve_chunks_with_chunk_content_from_query_id(
+async def retrieve_chunks_with_chunk_content_from_query_id(
     query_id: UUID,
     user_id: UUID,
     tenant_id: UUID,
 ):
-    try:
-        response = (
-            supabase.table("retrieved_chunks")
-            .select("""
-        *,
-        chunks (
-            content
-        )
-        """)
-            .eq("query_id",str(query_id))
-            .eq("tenant_id", str(tenant_id))
-            .eq("user_id", str(user_id))
-            .execute()
-        )
+    query_sql = """
+    SELECT
+        rc.*,
+        c.content
+    FROM retrieved_chunks rc
+    JOIN chunks c
+        ON rc.chunk_id = c.chunk_id
+    WHERE rc.query_id = %s
+      AND rc.user_id = %s
+      AND rc.tenant_id = %s
+    """
 
-        return response.data
-    except APIError as error:
-        print("Error at fetching retreived data", error)
-        raise
-    
-    
-def retrieve_chunks_with_chunk_content(
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                query_sql,
+                (
+                    query_id,
+                    user_id,
+                    tenant_id,
+                ),
+            )
+
+            return await cur.fetchall()
+
+
+# ==========================================================
+# FETCH CHUNKS BY CHUNK IDS
+# ==========================================================
+
+async def retrieve_chunks_with_chunk_content(
     chunk_ids: list[UUID],
     user_id: UUID,
     tenant_id: UUID,
 ):
+    query_sql = """
+    SELECT
+        rc.*,
+        c.content
+    FROM retrieved_chunks rc
+    JOIN chunks c
+        ON rc.chunk_id = c.chunk_id
+    WHERE rc.chunk_id = ANY(%s)
+      AND rc.user_id = %s
+      AND rc.tenant_id = %s
+    """
 
-    try:
-        response = (
-            supabase.table("retrieved_chunks")
-            .select("""
-        *,
-        chunks (
-            content
-        )
-        """)
-            .in_("chunk_id", [str(chunk_id) for chunk_id in chunk_ids])
-            .eq("tenant_id", str(tenant_id))
-            .eq("user_id", str(user_id))
-            .execute()
-        )
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                query_sql,
+                (
+                    chunk_ids,
+                    user_id,
+                    tenant_id,
+                ),
+            )
 
-        return response.data
-    except APIError as error:
-        print("Error at fetching retreived data", error)
-        raise
+            return await cur.fetchall()
 
 
-def fetch_top_retrieved_chunks(
+# ==========================================================
+# TOP RETRIEVED CHUNKS
+# ==========================================================
+
+async def fetch_top_retrieved_chunks(
     query_id: UUID,
-    TOP_K: int,
+    top_k: int,
     user_id: UUID,
     tenant_id: UUID,
 ):
-    try:
-        response = (
-            supabase.table("retrieved_chunks")
-            .select("""
-            *,
-            chunks (
-                content
+    query_sql = """
+    SELECT
+        rc.*,
+        c.content
+    FROM retrieved_chunks rc
+    JOIN chunks c
+        ON rc.chunk_id = c.chunk_id
+    WHERE rc.query_id = %s
+      AND rc.user_id = %s
+      AND rc.tenant_id = %s
+    ORDER BY rc.vector_score DESC
+    LIMIT %s
+    """
+
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                query_sql,
+                (
+                    query_id,
+                    user_id,
+                    tenant_id,
+                    top_k,
+                ),
             )
-            """)
-            .eq("query_id", str(query_id))
-            .eq("tenant_id", str(tenant_id))
-            .eq("user_id", str(user_id))
-            .order("vector_score", desc=True)
-            .limit(int(TOP_K))
-            .execute()
-        )
 
-        normalized_rows = []
-
-        for row in response.data:
-            normalized_rows.append({
-                "query_id": row["query_id"],
-                "chunk_id": row["chunk_id"],
-                "document_id": row["document_id"],
-                "tenant_id": row["tenant_id"],
-                "user_id": row["user_id"],
-                "vector_score": row["vector_score"],
-                "content": row["chunks"]["content"],
-            })
-
-        return normalized_rows
-
-    except APIError as error:
-        print("Error at fetching top retrieved data", error)
-        raise
+            return await cur.fetchall()

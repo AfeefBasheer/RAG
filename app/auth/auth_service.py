@@ -1,3 +1,4 @@
+from fastapi import HTTPException
 from app.auth.auth_repository import get_user_by_email
 from app.auth.auth_schema import UserLoginRequestSchema, UserRecord
 from bcrypt import checkpw
@@ -13,11 +14,13 @@ JWT_LIFETIME = os.getenv("JWT_EXPIRY_MINUTES")
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM")
 
 
-def login_user(request_user: UserLoginRequestSchema):
-    user_data = get_user_by_email(request_user.email)
-
+async def login_user(request_user: UserLoginRequestSchema):
+    user_data = await get_user_by_email(request_user.email)
     if not user_data:
-        raise ValueError("User not found")
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid Username or Password"
+        )
     user = UserRecord(
         user_id=user_data["user_id"],
         password_hash=user_data["password_hash"],
@@ -27,7 +30,10 @@ def login_user(request_user: UserLoginRequestSchema):
     if not checkpw(
         request_user.password.encode("utf-8"), user.password_hash.encode("utf-8")
     ):
-        raise ValueError("Invalid Password")
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid Username or Password"
+        )
     token = create_new_token(user)
     return token
 

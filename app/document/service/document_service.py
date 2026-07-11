@@ -15,7 +15,7 @@ from app.core.exception import JobFailureException
 
 
 
-def admit_text(text: TextSchema, user_id: UUID, tenant_id: UUID):
+async def admit_text(text: TextSchema, user_id: UUID, tenant_id: UUID):
     content_hash = hash_content(text.content)
     document_record = DocumentRecord(
         tenant_id=tenant_id,
@@ -26,24 +26,24 @@ def admit_text(text: TextSchema, user_id: UUID, tenant_id: UUID):
         status="admitted",
     )
 
-    response = insert_document(document_record)
+    response = await insert_document(document_record)
     return response
 
 
-def fetch_document_by_document_id(document_id: UUID, user_id: UUID, tenant_id: UUID):
-    response = get_document_by_document_id(document_id, user_id, tenant_id)
+async def fetch_document_by_document_id(document_id: UUID, user_id: UUID, tenant_id: UUID):
+    response = await get_document_by_document_id(document_id, user_id, tenant_id)
     return response
 
 
-def mark_document_chunked(document_id: UUID, user_id: UUID, tenant_id: UUID):
-    return update_document_status("chunked", document_id, user_id, tenant_id)
+async def mark_document_chunked(document_id: UUID, user_id: UUID, tenant_id: UUID):
+    return await update_document_status("chunked", document_id, user_id, tenant_id)
 
 
-def mark_document_embedded(document_id: UUID, user_id: UUID, tenant_id: UUID):
-    return update_document_status("embedded", document_id, user_id, tenant_id)
+async def mark_document_embedded(document_id: UUID, user_id: UUID, tenant_id: UUID):
+    return await update_document_status("embedded", document_id, user_id, tenant_id)
 
 
-def remove_document_record(record):
+async def remove_document_record(record):
     document_id = record.document_id
     user_id = record.user_id
     tenant_id = record.tenant_id
@@ -68,7 +68,7 @@ def remove_document_record(record):
         )
 
     try:
-        document_delete_response = delete_document_by_document_id(
+        document_delete_response = await delete_document_by_document_id(
             document_id, user_id, tenant_id
         )
     except Exception as e:

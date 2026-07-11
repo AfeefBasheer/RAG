@@ -1,74 +1,119 @@
-from app.database.postgres import supabase
-from postgrest.exceptions import APIError
+from app.database.postgres import pool
 from uuid import UUID
+from psycopg.types.json import Json
 
+async def create_job(job_type: str, document_id: UUID, user_id: UUID, tenant_id: UUID):
 
-def create_job(job_type, document_id: UUID, user_id: UUID, tenant_id: UUID):
-    try:
-        return supabase.rpc(
-            "create_job",
-            {
-                "p_job_type": job_type,
-                "p_document_id": str(document_id),
-                "p_user_id": str(user_id),
-                "p_tenant_id": str(tenant_id),
-            },
-        ).execute()
-    except APIError as error:
-        print("Error at create_job", error)
-        raise
+    QUERY = """
+        SELECT create_job(%s, %s, %s, %s)
+    """
 
-
-def fetch_embed_job():
-    try:
-        response = supabase.rpc("fetch_and_lock_embed_job").execute()
-        if response.data:
-            return response.data[0]
-        else:
-            return None
-    except APIError as error:
-        print("Error at fetch_job", error)
-        raise
-
-def fetch_general_job():
-    try:
-        response = supabase.rpc("fetch_and_lock_general_job").execute()
-        if response.data:
-            return response.data[0]
-        else:
-            return None
-    except APIError as error:
-        print("Error at fetch_job", error)
-        raise
-
-
-def update_job(status, job_id: UUID, errors: list = None, attempt=3):
-    try:
-        response = (
-            supabase.table("job_queue")
-            .update(
-                {"status": status, "error": errors, "attempt": attempt}
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                QUERY,
+                (
+                    job_type,
+                    document_id,
+                    user_id,
+                    tenant_id,
+                ),
             )
-            .eq("job_id", job_id)
-            .execute()
-        )
-        return response
-    except APIError as error:
-        print("Error at update_job", error)
-        raise
+
+            result = await cur.fetchone()
+            await conn.commit()
+            return result
 
 
-def get_job_by_job_id(job_id: UUID, user_id: UUID, tenant_id: UUID):
-    try:
-        response = (
-            supabase.table("job_queue")
-            .select("status,error,document_id,job_type")
-            .eq("job_id", job_id)
-            .eq("user_id", user_id)
-            .eq("tenant_id", tenant_id)
-            .execute()
-        )
-        return response.data
-    except APIError as error:
-        print("Error at fetching job", error)
-        raise
+async def fetch_embed_job():
+
+    QUERY = """
+        SELECT *
+        FROM fetch_and_lock_embed_job()
+    """
+    async with pool.connection() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(QUERY)
+                result = await cur.fetchone()
+
+    return result if result else None
+
+
+
+async def fetch_general_job():
+    QUERY = """
+        SELECT *
+        FROM fetch_and_lock_general_job()
+    """
+    
+    async with pool.connection() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(QUERY)
+                result = await cur.fetchone()
+                return result if result else None
+
+
+
+async def update_job(
+    status: str,
+    job_id: UUID,
+    errors: list | None = None,
+    attempt: int = 3,
+):
+    QUERY = """
+        UPDATE job_queue
+        SET
+            status = %s,
+            error = %s,
+            attempt = %s
+        WHERE job_id = %s
+        RETURNING *
+    """
+
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                QUERY,
+                    (
+                        status,
+                        Json(errors),
+                        attempt,
+                        job_id,
+                    ),
+                )
+
+            result = await cur.fetchone()
+            await conn.commit()
+            return result
+
+
+
+async def get_job_by_job_id(
+    job_id: UUID,
+    user_id: UUID,
+    tenant_id: UUID,
+):
+    QUERY = """
+        SELECT
+            status,
+            error,
+            document_id,
+            job_type
+        FROM job_queue
+        WHERE job_id = %s
+          AND user_id = %s
+          AND tenant_id = %s
+    """
+
+    async with pool.connection() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    QUERY,
+                    (
+                        job_id,
+                        user_id,
+                        tenant_id,
+                    ),
+                )
+                
+                return await cur.fetchone()

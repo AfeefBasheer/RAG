@@ -1,18 +1,20 @@
-from app.database.postgres import supabase
-from postgrest.exceptions import APIError
+from app.database.postgres import pool
 
+async def get_user_by_email(email: str):
 
-def get_user_by_email(email:str):
-    try:
-        response = (
-        supabase.table("users")
-        .select("user_id, email, password_hash,tenant_id")
-        .eq("email",email)
-        .execute()
-    )
-        if response.data:
-            return response.data[0]
-        else: return None
-    except APIError as error:
-        print('error occured at get_user_by_email ',error)
-        raise
+    query = """
+        SELECT
+            user_id,
+            email,
+            password_hash,
+            tenant_id
+        FROM users
+        WHERE email = %s
+    """
+
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(query, (email,))
+
+            user = await cur.fetchone()
+            return user

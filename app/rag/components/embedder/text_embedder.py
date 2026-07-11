@@ -10,6 +10,7 @@ EMBEDDER_KEY = os.getenv("HF_TOKEN")
 headers = {"Authorization": f"Bearer {EMBEDDER_KEY}"}
 
 def embed_the_chunks(chunks: list,TIMEOUT: int) -> list:
+    print(repr(API_URL))  # repr() will expose sneaky whitespace/\r/\n
     validated_batches = validate_chunks(chunks)
     total_embeddings = []
     for validated_chunks in validated_batches:

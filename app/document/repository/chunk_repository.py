@@ -1,39 +1,77 @@
-from app.database.postgres import supabase
-from postgrest.exceptions import APIError
 from uuid import UUID
 
-
-def create_chunks(rows: list[dict]):
-    try:
-        response = supabase.table("chunks").insert(rows).execute()
-        return response.data
-    except APIError as error:
-        print("Error at create_chunks", error)
-        raise
+from app.database.postgres import pool
 
 
-def get_chunks_by_document_id(document_id: UUID, user_id: UUID, tenant_id: UUID):
-    try:
-        response = (
-            supabase.table("chunks")
-            .select("*")
-            .eq("document_id", document_id)
-            .eq("user_id", user_id)
-            .eq("tenant_id", tenant_id)
-            .execute()
-        )
-        return response.data
-    except APIError as error:
-        print("Error at get_chunks_by_document_id", error)
-        raise
+async def create_chunks(rows: list[dict]):
+    QUERY = """
+    INSERT INTO chunks (
+    document_id,
+    user_id,
+    tenant_id,
+    content,
+    content_hash,
+    char_count,
+    chunk_index
+)
+VALUES (
+    %(document_id)s,
+    %(user_id)s,
+    %(tenant_id)s,
+    %(content)s,
+    %(content_hash)s,
+    %(char_count)s,
+    %(chunk_index)s
+)
+"""
+
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.executemany(QUERY, rows)
+            await conn.commit()
 
 
-def fetch_chunks_by_chunk_ids(chunk_ids:list, user_id:UUID, tenant_id:UUID):
-    try:
-        response = supabase.table("chunks").select("*").in_("chunk_id", chunk_ids).eq(
-            "tenant_id", str(tenant_id)
-        ).eq("user_id", str(user_id)).execute()
-        return response.data
-    except APIError as error:
-        print("Error at retrive_chunks", error)
-        raise
+async def get_chunks_by_document_id(
+    document_id: UUID,
+    user_id: UUID,
+    tenant_id: UUID,
+):
+    QUERY = """
+        SELECT *
+        FROM chunks
+        WHERE document_id = %s
+          AND tenant_id = %s
+          AND user_id = %s
+    """
+
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                QUERY,
+                (document_id, tenant_id, user_id),
+            )
+
+            return await cur.fetchall()
+
+
+async def fetch_chunks_by_chunk_ids(
+    chunk_ids: list[UUID],
+    user_id: UUID,
+    tenant_id: UUID,
+):
+    QUERY = """
+        SELECT *
+        FROM chunks
+        WHERE chunk_id = ANY(%s)
+          AND tenant_id = %s
+          AND user_id = %s
+    """
+
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                QUERY,
+                (chunk_ids, tenant_id, user_id),
+            )
+
+            return await cur.fetchall()
